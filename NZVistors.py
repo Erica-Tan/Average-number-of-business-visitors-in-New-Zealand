@@ -7,9 +7,32 @@ from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.tsa.arima_model import ARIMA
+from statsmodels.tsa.arima_model import ARIMAResults
+from scipy.stats import boxcox
+from math import sqrt
+from math import log
+from math import exp
 import warnings
 
 series = pd.Series.from_csv('data/Average-number-of-visitors-in-New-Zealand-for-business.csv', header=0)
+
+
+# create dataset.csv and test.csv
+split_point = len(series) - 5
+dataset, test = series[0:split_point], series[split_point:]
+print('Dataset %d, Test %d' % (len(dataset), len(test)))
+dataset.to_csv('data/dataset.csv')
+test.to_csv('data/test.csv')
+
+# load data
+series = pd.Series.from_csv('data/dataset.csv')
+# prepare data
+# split into train and validation sets
+X = series.values
+X = X.astype('float32')
+train_size = int(len(X) * 0.60)
+train, validation = X[0:train_size], X[train_size:]
+
 
 
 print(series.head())
@@ -17,6 +40,9 @@ print(series.head())
 print('\n Data Types:')
 print(series.dtypes)
 
+print(series.describe())
+
+# line plot
 plt.plot(series)
 plt.show()
 
@@ -60,6 +86,45 @@ plt.tight_layout()
 plt.show()
 
 
+# Box and Whisker Plots
+groups = series['1999':'2011'].groupby(pd.TimeGrouper('A'))
+years = pd.DataFrame()
+for name, group in groups:
+	years[name.year] = group.values
+years.boxplot()
+plt.show()
+
+
+
+# Baseline model
+def baseline_model(train, test):
+        # walk-forward validation
+        history = [x for x in train]
+        predictions = list()
+        for i in range(len(test)):
+            # predict
+            yhat = history[-1]
+            predictions.append(yhat)
+            
+            # observation
+            obs = validation[i]
+            history.append(obs)
+        mse = mean_squared_error(test, predictions)
+        rmse = sqrt(mse)
+        print('Baseline model:')
+        print('Test RMSE: %.3f' % rmse)
+
+        # plot predictions and expected results
+        plt.plot(train)
+        plt.plot([None for i in train] + [x for x in test])
+        plt.plot([None for i in train] + [x for x in predictions])
+        plt.show()
+
+        return predictions
+
+baseline_model(train, validation)
+
+# ARIMA Model
 # check if it is stationary
 def test_stationarity(timeseries):
     #Determing rolling statistics
@@ -97,43 +162,6 @@ plt.show()
 test_stationarity(ts_diff)
 
 
-# Baseline model
-# Create lagged dataset
-values = pd.DataFrame(series.values)
-dataframe = pd.concat([values.shift(1), values], axis=1)
-dataframe.columns = ['t-1', 't+1']
-
-
-# split into train and test sets
-X = dataframe.values
-train_size = int(len(X) * 0.9)
-train, test = X[1:train_size], X[train_size:]
-train_X, train_y = train[:,0], train[:,1]
-test_X, test_y = test[:,0], test[:,1]
-
-
-
-# persistence model
-def model_persistence(x):
-	return x
-
-# walk-forward validation
-predictions = list()
-for x in test_X:
-	yhat = model_persistence(x)
-	predictions.append(yhat)
-test_score = mean_squared_error(test_y, predictions)
-print('Baseline model:')
-print('Test MSE: %.3f' % test_score)
-
-# plot predictions and expected results
-plt.plot(train_y)
-plt.plot([None for i in train_y] + [x for x in test_y])
-plt.plot([None for i in train_y] + [x for x in predictions])
-plt.show()
-
-
-# Grid search ARIMA model
 lag_acf = acf(ts_diff, nlags=40)
 lag_pacf = pacf(ts_diff, nlags=40, method='ols')
 
@@ -158,12 +186,9 @@ plt.show()
 
 
 
+# Grid Search ARIMA model
 # evaluate an ARIMA model for a given order (p,d,q)
-def evaluate_arima_model(X, arima_order):
-	# split into train and test sets
-	train_size = int(len(X) * 0.60)
-	train, test = X[0:train_size], X[train_size:]
-
+def evaluate_arima_model(train, test, arima_order):
 	# walk-forward validation
 	history = [x for x in train]
 	predictions = list()
@@ -172,15 +197,18 @@ def evaluate_arima_model(X, arima_order):
 		model_fit = model.fit(disp=0)
 		yhat = model_fit.forecast()[0]
 		predictions.append(yhat)
-		history.append(test[t])
+
+		obs = test[t]
+		history.append(obs)
+		#print('predicted=%f, expected=%f' % (yhat, obs))
 		
 	# calculate out of sample error
-	error = mean_squared_error(test, predictions)
-	return error
+	mse = mean_squared_error(test, predictions)
+	rmse = sqrt(mse)
+	return rmse
 
 # evaluate combinations of p, d and q values for an ARIMA model
-def evaluate_models(dataset, p_values, d_values, q_values):
-	dataset = dataset.astype('float32')
+def evaluate_models(train, test, p_values, d_values, q_values):
 	best_score, best_cfg = float("inf"), None
 
 	# Iterate ARIMA Parameters
@@ -189,26 +217,24 @@ def evaluate_models(dataset, p_values, d_values, q_values):
 			for q in q_values:
 				order = (p,d,q)
 				try:
-					mse = evaluate_arima_model(dataset, order)
-					if mse < best_score:
-						best_score, best_cfg = mse, order
-					print('ARIMA%s MSE=%.3f' % (order,mse))
+					rmse = evaluate_arima_model(train, test, order)
+					if rmse < best_score:
+						best_score, best_cfg = rmse, order
+					print('ARIMA%s RMSE=%.3f' % (order,rmse))
 				except:
 					continue
-	print('Best ARIMA%s MSE=%.3f' % (best_cfg, best_score))
+	print('Best ARIMA%s RMSE=%.3f' % (best_cfg, best_score))
 
 p_values = range(0, 4)
 d_values = [1]
 q_values = range(0, 4)
 warnings.filterwarnings("ignore")
-evaluate_models(series.values, p_values, d_values, q_values)
-
+evaluate_models(train, validation, p_values, d_values, q_values)
 
 # ARIMA model
-
-# evaluate an ARIMA model for a given order (p,d,q)
-def evaluate_arima_model(train, test,  arima_order):
-        # walk forward over time steps in test
+# an ARIMA model for a given order (p,d,q)
+def arima_model(train, test,  arima_order):
+    # walk forward over time steps in test
 	history = [x for x in train]
 	# make predictions
 	predictions = list()
@@ -220,35 +246,27 @@ def evaluate_arima_model(train, test,  arima_order):
 		predictions.append(yhat)
 		obs = test[t]
 		history.append(obs)
-		print('predicted=%f, expected=%f' % (yhat, obs))
+		#print('predicted=%f, expected=%f' % (yhat, obs))
 		
 	# calculate out of sample error
-	error = mean_squared_error(test, predictions)
-	print('Test MSE: %.3f' % error)
-	print('RSS: %.4f'% sum((predictions-test)**2))
-
+	mse = mean_squared_error(test, predictions)
+	rmse = sqrt(mse)
+    
 	# plot
 	plt.plot(test)
 	plt.plot(predictions, color='red')
-	plt.title('SME: %.4f'% error)
+	plt.title('RSME: %.4f'% rmse)
 	plt.show()
 
 	return predictions
 
-
 warnings.filterwarnings("ignore")
-dataset = series.astype('float')
-dataset = dataset.values
+predictions = arima_model(train, validation, (1, 1, 2))
 
-# split into train and test sets
-train_size = int(len(dataset) * 0.60)
-train, test = dataset[0:train_size], dataset[train_size:]
-
-predictions = evaluate_arima_model(train, test, (3, 1, 2))
 
 
 # calculate residuals
-residuals = [test[i]-predictions[i] for i in range(len(predictions))]
+residuals = [validation[i]-predictions[i] for i in range(len(predictions))]
 residuals = pd.DataFrame(residuals)
 
 # plot residuals
@@ -265,3 +283,201 @@ plt.show()
 # density plot
 residuals.plot(kind='kde')
 plt.show()
+
+
+# Grid Search Transform ARIMA model
+# invert box-cox transform
+def boxcox_inverse(value, lam):
+	if lam == 0:
+		return exp(value)
+	return exp(log(lam * value + 1) / lam)
+
+
+# evaluate an ARIMA model for a given order (p,d,q)
+def transform_arima_model(train, test, arima_order):
+	# walk-forward validation
+	history = [x for x in train]
+	predictions = list()
+	for t in range(len(test)):
+		# transform
+		transformed, lam = boxcox(history)
+		if lam < -5:
+		    transformed, lam = history, 1
+					
+		model = ARIMA(transformed, order=arima_order)
+		model_fit = model.fit(disp=0)
+		yhat = model_fit.forecast()[0]
+
+		# invert transformed prediction
+		yhat = boxcox_inverse(yhat, lam)
+		
+		predictions.append(yhat)
+
+		obs = test[t]
+		history.append(obs)
+
+		#print('predicted=%f, expected=%f' % (yhat, obs))
+		
+	# calculate out of sample error
+	mse = mean_squared_error(test, predictions)
+	rmse = sqrt(mse)
+	return rmse, predictions
+
+# evaluate combinations of p, d and q values for an ARIMA model
+def evaluate_models(train, test, p_values, d_values, q_values):
+	best_score, best_cfg = float("inf"), None
+
+	# Iterate ARIMA Parameters
+	for p in p_values:
+		for d in d_values:
+			for q in q_values:
+				order = (p,d,q)
+				try:
+					rmse = transform_arima_model(train, test, order)
+					if rmse < best_score:
+						best_score, best_cfg = rmse, order
+					print('ARIMA%s RMSE=%.3f' % (order,rmse))
+				except:
+					continue
+	print('Best ARIMA%s RMSE=%.3f' % (best_cfg, best_score))
+
+p_values = range(0, 4)
+d_values = [1]
+q_values = range(0, 4)
+warnings.filterwarnings("ignore")
+evaluate_models(train, validation, p_values, d_values, q_values)
+
+
+# Transform ARIMA model
+# invert box-cox transform
+def boxcox_inverse(value, lam):
+	if lam == 0:
+		return exp(value)
+	return exp(log(lam * value + 1) / lam)
+
+
+# an transform ARIMA model for a given order (p,d,q)
+def transform_arima_model(train, test, arima_order):
+	# walk-forward validation
+	history = [x for x in train]
+	predictions = list()
+	for t in range(len(test)):
+		# transform
+		transformed, lam = boxcox(history)
+		if lam < -5:
+		    transformed, lam = history, 1
+					
+		model = ARIMA(transformed, order=arima_order)
+		model_fit = model.fit(disp=0)
+		yhat = model_fit.forecast()[0]
+
+		# invert transformed prediction
+		yhat = boxcox_inverse(yhat, lam)
+		
+		predictions.append(yhat)
+
+		obs = test[t]
+		history.append(obs)
+
+		#print('predicted=%f, expected=%f' % (yhat, obs))
+		
+	# calculate out of sample error
+	mse = mean_squared_error(test, predictions)
+	rmse = sqrt(mse)
+    
+	# plot
+	plt.plot(test)
+	plt.plot(predictions, color='red')
+	plt.title('RSME: %.4f'% rmse)
+	plt.show()
+
+	return predictions
+
+warnings.filterwarnings("ignore")
+predictions = transform_arima_model(train, validation, (1, 1, 2))
+
+
+# calculate residuals
+residuals = [validation[i]-predictions[i] for i in range(len(predictions))]
+residuals = pd.DataFrame(residuals)
+
+# summary statistics
+print(residuals.describe())
+
+# density plot
+residuals.plot(kind='kde')
+plt.show()
+
+
+# Finalize Model
+# monkey patch around bug in ARIMA class
+def __getnewargs__(self):
+	return ((self.endog),(self.k_lags, self.k_diff, self.k_ma))
+ 
+ARIMA.__getnewargs__ = __getnewargs__
+
+# load data
+series = pd.Series.from_csv('data/dataset.csv')
+# prepare data
+X = series.values
+X = X.astype('float32')
+# transform data
+transformed, lam = boxcox(X)
+# fit model
+model = ARIMA(transformed, order=(1, 1, 2))
+model_fit = model.fit(disp=0)
+# save model
+model_fit.save('model.pkl')
+np.save('model_lambda.npy', [lam])
+
+
+
+# Validate Model
+# load and prepare datasets
+dataset = pd.Series.from_csv('data/dataset.csv')
+X = dataset.values.astype('float32')
+history = [x for x in X]
+test = pd.Series.from_csv('data/test.csv')
+y = test.values.astype('float32')
+
+# load model
+model_fit = ARIMAResults.load('model.pkl')
+lam = np.load('model_lambda.npy')
+
+# make first prediction
+predictions = list()
+yhat = model_fit.forecast()[0]
+yhat = boxcox_inverse(yhat, lam)
+predictions.append(yhat)
+history.append(y[0])
+#print('>Predicted=%.3f, Expected=%3.f' % (yhat, y[0]))
+
+# rolling forecasts
+for i in range(1, len(y)):
+	# transform
+	transformed, lam = boxcox(history)
+	if lam < -5:
+		transformed, lam = history, 1
+
+	# predict
+	model = ARIMA(transformed, order=(1, 1, 2))
+	model_fit = model.fit(disp=0)
+	yhat = model_fit.forecast()[0]
+
+	# invert transformed prediction
+	yhat = boxcox_inverse(yhat, lam)
+
+	predictions.append(yhat)
+	# observation
+	obs = y[i]
+	history.append(obs)
+	print('>Predicted=%.3f, Expected=%3.f' % (yhat, obs))
+# report performance
+mse = mean_squared_error(y, predictions)
+rmse = sqrt(mse)
+
+plt.plot(y)
+plt.plot(predictions, color='red')
+plt.title('RSME: %.4f'% rmse)
+plt.show()
+
