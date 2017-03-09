@@ -7,7 +7,6 @@ Predicted the average number of business visitors in New Zealand. You can downlo
 * Install the requirements using `pip install -r requirements.txt`.
 
 ### Usage
------------------------
 
 * Run `preprocess.py` to create the `dataset` and `test` datasets, and create some plot to visulize the data.
     * This will create `dataset.csv` and `test.csv` in the `processed` folder.
