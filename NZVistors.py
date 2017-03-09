@@ -1,9 +1,9 @@
 import pandas as pd
+from pandas.tools.plotting import autocorrelation_plot
 import numpy as np
 import matplotlib.pyplot as plt
-from pandas.tools.plotting import autocorrelation_plot
-from statsmodels.tsa.stattools import adfuller
 from sklearn.metrics import mean_squared_error
+from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.tsa.arima_model import ARIMA
@@ -13,37 +13,26 @@ from math import sqrt
 from math import log
 from math import exp
 import warnings
+import settings
 
-series = pd.Series.from_csv('data/Average-number-of-visitors-in-New-Zealand-for-business.csv', header=0)
+series = pd.Series.from_csv(settings.DATA_DIR + 'Average-number-of-visitors-in-New-Zealand-for-business.csv', header=0)
 
+print(series.head())
+print('\n Data Types:')
+print(series.dtypes)
 
 # create dataset.csv and test.csv
 split_point = len(series) - 5
 dataset, test = series[0:split_point], series[split_point:]
 print('Dataset %d, Test %d' % (len(dataset), len(test)))
-dataset.to_csv('data/dataset.csv')
-test.to_csv('data/test.csv')
-
-# load data
-series = pd.Series.from_csv('data/dataset.csv')
-# prepare data
-# split into train and validation sets
-X = series.values
-X = X.astype('float32')
-train_size = int(len(X) * 0.60)
-train, validation = X[0:train_size], X[train_size:]
+dataset.to_csv(settings.PROCESSED_DIR + 'dataset.csv')
+test.to_csv(settings.PROCESSED_DIR + 'test.csv')
 
 
-
-print(series.head())
-
-print('\n Data Types:')
-print(series.dtypes)
-
-print(series.describe())
+print(dataset.describe())
 
 # line plot
-plt.plot(series)
+plt.plot(dataset)
 plt.show()
 
 
@@ -52,26 +41,26 @@ plt.show()
 # autocorrelation plot
 # The time series shows a strong temporal dependence that
 # decays linearly or in a similar pattern.
-autocorrelation_plot(series)
+autocorrelation_plot(dataset)
 plt.show()
 
 # Histograms and density plots provide insight into the distribution of all observations
 # histograms
-plt.hist(series)
+plt.hist(dataset)
 plt.show()
 # density plot
-series.plot(kind='kde')
+dataset.plot(kind='kde')
 plt.show()
 
 # decomposition plot 
-decomposition = seasonal_decompose(series)
+decomposition = seasonal_decompose(dataset)
 
 trend = decomposition.trend
 seasonal = decomposition.seasonal
 residual = decomposition.resid
 
 plt.subplot(411)
-plt.plot(series, label='Original')
+plt.plot(dataset, label='Original')
 plt.legend(loc='best')
 plt.subplot(412)
 plt.plot(trend, label='Trend')
@@ -87,7 +76,7 @@ plt.show()
 
 
 # Box and Whisker Plots
-groups = series['1999':'2011'].groupby(pd.TimeGrouper('A'))
+groups = dataset['1999':'2011'].groupby(pd.TimeGrouper('A'))
 years = pd.DataFrame()
 for name, group in groups:
 	years[name.year] = group.values
@@ -95,6 +84,13 @@ years.boxplot()
 plt.show()
 
 
+# Build Models
+
+# prepare data
+# split into train and validation sets
+X = dataset.values.astype('float32')
+train_size = int(len(X) * 0.60)
+train, validation = X[0:train_size], X[train_size:]
 
 # Baseline model
 def baseline_model(train, test):
@@ -417,43 +413,45 @@ def __getnewargs__(self):
 ARIMA.__getnewargs__ = __getnewargs__
 
 # load data
-series = pd.Series.from_csv('data/dataset.csv')
+dataset = pd.Series.from_csv(settings.PROCESSED_DIR + 'dataset.csv')
 # prepare data
-X = series.values
-X = X.astype('float32')
+X = dataset.values.astype('float32')
 # transform data
+warnings.filterwarnings("ignore")
 transformed, lam = boxcox(X)
 # fit model
 model = ARIMA(transformed, order=(1, 1, 2))
 model_fit = model.fit(disp=0)
 # save model
-model_fit.save('model.pkl')
-np.save('model_lambda.npy', [lam])
+model_fit.save(settings.OUTPUT_DIR + 'model.pkl')
+np.save(settings.OUTPUT_DIR + 'model_lambda.npy', [lam])
 
 
 
 # Validate Model
 # load and prepare datasets
-dataset = pd.Series.from_csv('data/dataset.csv')
+dataset = pd.Series.from_csv(settings.PROCESSED_DIR + 'dataset.csv')
 X = dataset.values.astype('float32')
 history = [x for x in X]
-test = pd.Series.from_csv('data/test.csv')
-y = test.values.astype('float32')
+test = pd.Series.from_csv(settings.PROCESSED_DIR + 'test.csv')
+Y = test.values.astype('float32')
 
 # load model
-model_fit = ARIMAResults.load('model.pkl')
-lam = np.load('model_lambda.npy')
+model_fit = ARIMAResults.load(settings.OUTPUT_DIR + 'model.pkl')
+lam = np.load(settings.OUTPUT_DIR + 'model_lambda.npy')
+
+warnings.filterwarnings("ignore")
 
 # make first prediction
 predictions = list()
 yhat = model_fit.forecast()[0]
 yhat = boxcox_inverse(yhat, lam)
 predictions.append(yhat)
-history.append(y[0])
+history.append(Y[0])
 #print('>Predicted=%.3f, Expected=%3.f' % (yhat, y[0]))
 
 # rolling forecasts
-for i in range(1, len(y)):
+for i in range(1, len(Y)):
 	# transform
 	transformed, lam = boxcox(history)
 	if lam < -5:
@@ -469,14 +467,14 @@ for i in range(1, len(y)):
 
 	predictions.append(yhat)
 	# observation
-	obs = y[i]
+	obs = Y[i]
 	history.append(obs)
 	print('>Predicted=%.3f, Expected=%3.f' % (yhat, obs))
 # report performance
-mse = mean_squared_error(y, predictions)
+mse = mean_squared_error(Y, predictions)
 rmse = sqrt(mse)
 
-plt.plot(y)
+plt.plot(Y)
 plt.plot(predictions, color='red')
 plt.title('RSME: %.4f'% rmse)
 plt.show()
