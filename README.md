@@ -1,4 +1,4 @@
-# Average-number-of-business-visitors-in-New-Zealand
+# Average number of business visitors in New Zealand, 1998-2010
 
 Predicted the average number of business visitors in New Zealand. You can download the dataset in the `data` folder.
 
@@ -11,7 +11,7 @@ Predicted the average number of business visitors in New Zealand. You can downlo
 * Run `preprocess.py` to create the `dataset` and `test` datasets, and create some plot to visulize the data.
     * This will create `dataset.csv` and `test.csv` in the `processed` folder.
 * Run `build_model.py`.
-    * This will build 3 types of model including baseline Model, ARIMA Model, Transform ARIMA model.
+    * This will build 3 models including baseline Model, ARIMA Model, ARIMA model (with log transform).
     * It will use Grid Search to find the best parameters.
 * Run `predict.py`.
     * This will use the best model to predite the unseen data.
