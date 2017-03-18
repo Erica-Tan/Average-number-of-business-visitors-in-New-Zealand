@@ -1,6 +1,6 @@
 # Average number of business visitors in New Zealand, 1998-2010
 
-Predicted the average number of business visitors in New Zealand. You can download the dataset in the `data` folder.
+Forecasted the average number of business visitors in New Zealand. You can download the dataset in the `data` folder.
 
 ### Install the requirements
  
