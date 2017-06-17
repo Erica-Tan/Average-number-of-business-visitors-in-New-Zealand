@@ -8,10 +8,14 @@ Forecasted the average number of business visitors in New Zealand. You can downl
 
 ### Usage
 
-* Run `preprocess.py` to create the `dataset` and `test` datasets, and create some plot to visulize the data.
-    * This will create `dataset.csv` and `test.csv` in the `processed` folder.
-* Run `build_model.py`.
-    * This will build 3 models including baseline Model, ARIMA Model, ARIMA model (with log transform).
+* Run `data_preposessing.py` to create the `train` and `test` datasets, and create some plot to visulize the data.
+    * This will create `train.csv` and `test.csv` in the `processed` folder.
+* Run `baseline_model.py`.
+	* This will run Persistence forecast model across the training set, and evaluate the model on test set.
+* Run `ARIMA_model.py`.
+    * This will build 2 models including ARIMA Model, ARIMA model (with log transform).
     * It will use Grid Search to find the best parameters.
-* Run `predict.py`.
-    * This will use the best model to predite the unseen data.
+    * It will save the final model called `arima_model.pkl` to the output folder.
+* Run `LSTM_model.py`.
+    * This will run Long short-term memory Network across the training set, and evaluate the model on test set.
+    * It will save the final model called `lstm_model.json` and `lstm_model.h5` to the output folder.
