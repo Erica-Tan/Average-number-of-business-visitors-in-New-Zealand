@@ -8,14 +8,6 @@ from math import sqrt
 import warnings
 
 
-# load data
-series = pd.Series.from_csv(os.path.join(settings.PROCESSED_DIR, 'train.csv'))
-# prepare data
-# split into train and validation sets
-X = series.values.astype('float32')
-train_size = int(len(X) * 0.60)
-train, validation = X[0:train_size], X[train_size:]
-
 # Baseline model
 def baseline_model(train, test):
     # walk-forward validation
@@ -32,13 +24,45 @@ def baseline_model(train, test):
     rmse = sqrt(mean_squared_error(test, predictions))
     return rmse, predictions
 
+'''
+# load data
+series = pd.Series.from_csv(os.path.join(settings.PROCESSED_DIR, 'train.csv'))
+# prepare data
+# split into train and validation sets
+X = series.values.astype('float32')
+train, validation = X[0:-12], X[-12:]
+
+# fit model
 rmse, predictions = baseline_model(train, validation)
 
 print('Baseline model:')
 print('Validation RMSE: %.3f' % rmse)
+'''
 
+
+# load data
+train = pd.Series.from_csv(os.path.join(settings.PROCESSED_DIR, 'train.csv'))
+test = pd.Series.from_csv(settings.PROCESSED_DIR + 'test.csv')
+# prepare data
+X = train.values.astype('float32')
+y = test.values.astype('float32')
+
+# fit model
+rmse, predictions = baseline_model(X, y)
+
+print('Baseline model:')
+print('Test RMSE: %.3f' % rmse)
+
+'''
 # plot predictions and expected results
-plt.plot(train)
-plt.plot([None for i in train] + [x for x in test])
-plt.plot([None for i in train] + [x for x in predictions])
+plt.plot(X)
+plt.plot([None for i in X] + [x for x in Y])
+plt.plot([None for i in X] + [x for x in predictions])
 plt.show()
+'''
+
+plt.plot(y)
+plt.plot(predictions, color='red')
+plt.title('Persistence Model for test set')
+plt.savefig(os.path.join(settings.OUTPUT_DIR, "persistence_model.png"))
+plt.close()

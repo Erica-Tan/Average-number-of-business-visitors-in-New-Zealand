@@ -20,15 +20,17 @@ series = pd.Series.from_csv(os.path.join(settings.PROCESSED_DIR, 'dataset.csv'),
 split_point = len(series) - 5
 train, test = series[0:split_point], series[split_point:]
 print('Train %d, Test %d' % (len(train), len(test)))
-train.to_csv(settings.PROCESSED_DIR + 'train.csv')
-test.to_csv(settings.PROCESSED_DIR + 'test.csv')
+train.to_csv(os.path.join(settings.PROCESSED_DIR, 'train.csv'))
+test.to_csv(os.path.join(settings.PROCESSED_DIR, 'test.csv'))
 
 
 print(train.describe())
 
 # line plot
 plt.plot(train)
-plt.show()
+#plt.show()
+plt.savefig(os.path.join(settings.OUTPUT_DIR, 'line_plot.png'))
+plt.close()
 
 
 # check if it is random walk
@@ -37,15 +39,22 @@ plt.show()
 # The time series shows a strong temporal dependence that
 # decays linearly or in a similar pattern.
 autocorrelation_plot(train)
-plt.show()
+#plt.show()
+plt.savefig(os.path.join(settings.OUTPUT_DIR, 'autocorrelation_plot.png'))
+plt.close()
 
 # Histograms and density plots provide insight into the distribution of all observations
 # histograms
 plt.hist(train)
-plt.show()
+#plt.show()
+plt.savefig(os.path.join(settings.OUTPUT_DIR, 'histogram_plot.png'))
+plt.close()
+
 # density plot
 train.plot(kind='kde')
-plt.show()
+#plt.show()
+plt.savefig(os.path.join(settings.OUTPUT_DIR, 'density_plot.png'))
+plt.close()
 
 # decomposition plot 
 decomposition = seasonal_decompose(train)
@@ -67,7 +76,9 @@ plt.subplot(414)
 plt.plot(residual, label='Residuals')
 plt.legend(loc='best')
 plt.tight_layout()
-plt.show()
+#plt.show()
+plt.savefig(os.path.join(settings.OUTPUT_DIR, 'decomposition_plot.png'))
+plt.close()
 
 
 # Box and Whsker Plots
@@ -76,5 +87,6 @@ years = pd.DataFrame()
 for name, group in groups:
 	years[name.year] = group.values
 years.boxplot()
-plt.show()
-
+#plt.show()
+plt.savefig(os.path.join(settings.OUTPUT_DIR, 'box_whsker_plot.png'))
+plt.close()
