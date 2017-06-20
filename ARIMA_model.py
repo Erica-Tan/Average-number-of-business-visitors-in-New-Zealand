@@ -8,9 +8,10 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.stattools import adfuller
-from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.tsa.arima_model import ARIMA
 from statsmodels.tsa.arima_model import ARIMAResults
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.graphics.tsaplots import plot_pacf
 from scipy.stats import boxcox
 from math import sqrt
 from math import log
@@ -127,15 +128,19 @@ def plot_residuals(target, predictions, rmse):
     # line plot
     plt.subplot(311)
     residuals.plot(ax=plt.gca())
+    plt.title('Residual Line Plot')
     # histogram
     plt.subplot(312)
     residuals.hist(ax=plt.gca())
+    plt.title('Residual Histogram plot')
     # density plot
     plt.subplot(313)
     residuals.plot(kind='kde', ax=plt.gca())
-    #plt.show()
-    plt.savefig(os.path.join(settings.OUTPUT_DIR, 'arima_error.png'))
-    plt.close()
+    plt.title('Residual Density plot')
+    plt.tight_layout()
+    plt.show()
+    #plt.savefig(os.path.join(settings.OUTPUT_DIR, 'arima_error.png'))
+    #plt.close()
 
 
 
@@ -159,43 +164,40 @@ df_train = pd.Series(train)
 ts_diff = df_train - df_train.shift()
 ts_diff.dropna(inplace=True)
 
+
 plt.plot(ts_diff)
 plt.savefig(os.path.join(settings.OUTPUT_DIR, 'lineplot.png'))
 plt.close()
-#plt.show()
+plt.show()
+
 
 # check if stationary again
 #test_stationarity(ts_diff)
 
-# plot ACF AND PACF
-lag_acf = acf(ts_diff, nlags=40)
-lag_pacf = pacf(ts_diff, nlags=40, method='ols')
 
-# plot ACF: 
-plt.subplot(121) 
-plt.plot(lag_acf)
-plt.axhline(y=0,linestyle='--',color='gray')
-plt.axhline(y=-1.96/np.sqrt(len(ts_diff)),linestyle='--',color='gray')
-plt.axhline(y=1.96/np.sqrt(len(ts_diff)),linestyle='--',color='gray')
-plt.title('Autocorrelation Function')
-
-# plot PACF:
-plt.subplot(122)
-plt.plot(lag_pacf)
-plt.axhline(y=0,linestyle='--',color='gray')
-plt.axhline(y=-1.96/np.sqrt(len(ts_diff)),linestyle='--',color='gray')
-plt.axhline(y=1.96/np.sqrt(len(ts_diff)),linestyle='--',color='gray')
-plt.title('Partial Autocorrelation Function')
+plt.figure()
+plt.subplot(211)
+# plot ACF
+plot_acf(ts_diff, lags=50, ax=plt.gca())
+plt.subplot(212)
+# plot PACF
+plot_pacf(ts_diff, lags=50, ax=plt.gca())
 plt.tight_layout()
-plt.savefig(os.path.join(settings.OUTPUT_DIR, 'ACF&PACF.png'))
-plt.close()
-#plt.show()
+plt.show()
+
+
+# evaluate ARIMA model
+rmse, predictions = fit_arima_model(train, validation, (3, 1, 0))
+
+print('ARIMA model:')
+print('Validation RMSE: %.3f' % rmse)
+
 
 
 # grid Search ARIMA model
-p_values = range(0, 4)
-d_values = range(1, 3)
-q_values = range(0, 4)
+p_values = range(0, 12)
+d_values = range(1, 4)
+q_values = range(0, 12)
 evaluate_models(train, validation, fit_arima_model, p_values, d_values, q_values)
 
 
@@ -210,9 +212,9 @@ plot_residuals(validation, predictions, rmse)
 
 
 # grid search tranformed ARIMA model
-p_values = range(0, 4)
-d_values = range(1, 3)
-q_values = range(0, 4)
+p_values = range(0, 12)
+d_values = range(1, 4)
+q_values = range(0, 12)
 evaluate_models(train, validation, fit_transformed_arima_model, p_values, d_values, q_values)
 
 
@@ -226,7 +228,7 @@ print('Validation RMSE: %.3f' % rmse)
 plot_residuals(validation, predictions, rmse)
 '''
 
-'''
+
 # Finalize Model
 # monkey patch around bug in ARIMA class
 def __getnewargs__(self):
@@ -244,7 +246,8 @@ model_fit = model.fit(disp=0)
 # save model
 model_fit.save(os.path.join(settings.OUTPUT_DIR, 'arima_model.pkl'))
 
-'''
+
+
 # Validate Model
 # load model
 model_fit = ARIMAResults.load(os.path.join(settings.OUTPUT_DIR, 'arima_model.pkl'))
@@ -279,6 +282,7 @@ rmse = sqrt(mean_squared_error(y, predictions))
 
 print('Test RMSE: %.3f' % rmse)
 
+'''
 plt.plot(y)
 plt.plot(predictions, color='red')
 plt.title('ARIMA Model for test set')
@@ -287,5 +291,7 @@ plt.close()
 #plt.show()
 
 
+# plot error
+plot_residuals(y, predictions, rmse)
 
-
+'''

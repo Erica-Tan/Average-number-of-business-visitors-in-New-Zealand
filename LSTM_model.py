@@ -139,7 +139,7 @@ train, validation = supervised_values[0:-12], supervised_values[-12:]
 scaler, train_scaled, validation_scaled = scale(train, validation)
 
 # fit the model
-#evaluate_model(scaler, train_scaled, validation_scaled, raw_values)
+#evaluate_model(scaler, train_scaled, validation_scaled, raw_values, batch_size=1, epochs=1000, neurons=4, updates=0, seed=True)
 
 # experiment
 # vary training update epochs
@@ -163,7 +163,7 @@ for e in epochs:
 	print('>Epochs=%d, RMSE=%.3f' % (e, rmse))
 
 
-# vary training epochs
+# vary training batches
 batches = [1, 2, 4]
 for e in batches:
 	rmse, predictions = evaluate_model(scaler, train_scaled, validation_scaled, raw_values, batch_size=e)
@@ -178,8 +178,8 @@ for e in neurons:
 	print('>Neurons=%d, RMSE=%.3f' % (e, rmse))
 '''
 
-'''
-# Build final model
+
+# Finalize Model
 # load data
 train = pd.Series.from_csv(os.path.join(settings.PROCESSED_DIR, 'train.csv'))
 
@@ -207,7 +207,7 @@ with open(os.path.join(settings.OUTPUT_DIR, "lstm_model.json"), "w") as json_fil
 
 # serialize weights to HDF5
 lstm_model.save_weights(os.path.join(settings.OUTPUT_DIR, "lstm_model.h5"))
-'''
+
 
 
 
@@ -241,7 +241,6 @@ scaler, train_scaled, test_scaled = scale(supervised_train, supervised_test)
 
 batch_size=1
 #updates=2
-
 # forecast the entire training dataset to build up state for forecasting
 train_reshaped = train_scaled[:, 0].reshape(len(train_scaled), 1, 1)
 loaded_model.predict(train_reshaped, batch_size=batch_size)
